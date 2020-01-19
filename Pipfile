@@ -1,0 +1,18 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+pytest-html = "*"
+pytest = "*"
+v = {editable = true,version = "*"}
+
+[packages]
+flask = "*"
+flask-jsonpify = "*"
+pandas = "*"
+selenium = "*"
+
+[requires]
+python_version = "3.7"
