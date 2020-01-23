@@ -7,3 +7,9 @@ from webapp import app
 def index():
     return render_template('index.html')
 
+@app.route('/database')
+@app.route('/database.html')
+def database_page():
+    return render_template('database.html')
+
+

@@ -9,5 +9,6 @@ class MainPageLocators:
     RACES_PAGE_LINK = (By.ID, 'menu_link_races')
     TRACKS_PAGE_LINK = (By.ID, 'menu_link_tracks')
     DEEPNET_PAGE_LINK = (By.ID, 'menu_link_deepnet')
+    DATABASE_DROPDOWN = (By.ID, 'database_dropdown')
     DATABASE_PAGE_LINK = (By.ID, 'menu_link_database')
 
