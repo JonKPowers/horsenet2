@@ -59,3 +59,12 @@ class TestDatabasePage(BasicTest):
         
         assert 'Database' in database_page.get_title()
 
+class TestDatabaseAddFilesPage(BasicTest):
+    def test_page_links_from_homepage(self):
+        home_page = HomePage(self.driver)
+        home_page.load()
+        # Click dropdown to expose link
+        home_page.click_link(MainPageLocators.DATABASE_DROPDOWN)
+        linked_page = home_page.click_link(MainPageLocators.DATABASE_ADD_FILES_LINK)
+        assert 'Add File' in linked_page.title
+

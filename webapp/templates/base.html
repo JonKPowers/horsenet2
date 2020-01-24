@@ -32,9 +32,9 @@
           <li class="nav-item dropdown">
             <a id="database_dropdown" href="database.html" class="nav-link dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Database</a>
             <div class="dropdown-menu" labelledby="database_dropdown">
-              <a class="dropdown-item" href="database.html" id="menu_link_database">Database home</a>
-              <a class="dropdown-item" href="database/add_files.html" id="menu_link_database_add_files">Add data files</a>
-              <a class="dropdown-item" href="database/file_maintenance.html" id="menu_link_database_file_maintenance">File maintenance</a>
+              <a class="dropdown-item" href="{{ url_for('database_page') }}" id="menu_link_database">Database home</a>
+              <a class="dropdown-item" href="{{ url_for('database_add_files') }}" id="menu_link_database_add_files">Add data files</a>
+              <a class="dropdown-item" href="#" id="menu_link_database_file_maintenance">File maintenance</a>
             </div>
           </li>
         </ul>

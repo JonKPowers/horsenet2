@@ -12,4 +12,8 @@ def index():
 def database_page():
     return render_template('database.html')
 
+@app.route('/database/add_files.html')
+@app.route('/database/add_files')
+def database_add_files():
+    return render_template('database_add_files.html')
 

@@ -11,4 +11,5 @@ class MainPageLocators:
     DEEPNET_PAGE_LINK = (By.ID, 'menu_link_deepnet')
     DATABASE_DROPDOWN = (By.ID, 'database_dropdown')
     DATABASE_PAGE_LINK = (By.ID, 'menu_link_database')
+    DATABASE_ADD_FILES_LINK = (By.ID, 'menu_link_database_add_files')
 
