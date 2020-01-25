@@ -1,6 +1,6 @@
 from selenium.webdriver.common.by import By
 
-class MainPageLocators:
+class LinkLocators:
     """A class for main page locators.
 
     All main page locators should live here.

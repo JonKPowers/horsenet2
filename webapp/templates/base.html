@@ -4,12 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous"> 
-    <title>HorseNet v0.1 - {% block title%}{% endblock %}</title>
+    <title>{% block title%}{% endblock %} HorseNet v0.1</title>
   </head>
   <body>
     <nav class="navbar navbar-expand-md navbar-light bg-light">
-      <a href="index.html" id="menu_link_home" class="navbar-brand">
-        <img src="/static/horse_brain_3.png" width="102" height="85" class="d-inline-block align-top" alt="">
+      <a href="{{ url_for('index') }}" id="menu_link_home" class="navbar-brand">
+        <img src="{{ url_for('static', filename='horse_brain_3.png') }}" width="102" height="85" class="d-inline-block align-top" alt="">
       </a>
       <button class="navbar-toggler ml-auto" type="button" data-toggle="collapse" data-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
@@ -32,9 +32,9 @@
           <li class="nav-item dropdown">
             <a id="database_dropdown" href="database.html" class="nav-link dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Database</a>
             <div class="dropdown-menu" labelledby="database_dropdown">
-              <a class="dropdown-item" href="{{ url_for('database_page') }}" id="menu_link_database">Database home</a>
-              <a class="dropdown-item" href="{{ url_for('database_add_files') }}" id="menu_link_database_add_files">Add data files</a>
-              <a class="dropdown-item" href="#" id="menu_link_database_file_maintenance">File maintenance</a>
+              <a class="dropdown-item" href="{{ url_for('database.database_home') }}" id="menu_link_database">Database home</a>
+              <a class="dropdown-item" href="{{ url_for('database.database_add_files') }}" id="menu_link_database_add_files">Add data files</a>
+              <a class="dropdown-item" href="{{ url_for('database.database_file_maintenance') }}" id="menu_link_database_file_maintenance">File maintenance</a>
             </div>
           </li>
         </ul>

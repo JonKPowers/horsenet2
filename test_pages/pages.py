@@ -1,3 +1,5 @@
+from test_pages.urls import URLs
+
 class Page:
     def click_link(self, locator_tuple):
         link = self.browser.find_element(*locator_tuple)
@@ -5,7 +7,7 @@ class Page:
         return self.browser
 
 class HomePage(Page):
-    URL = 'http://localhost:5000'
+    URL = URLs.HOME_PAGE
 
     def __init__(self, browser):
         self.browser = browser
@@ -17,7 +19,7 @@ class HomePage(Page):
         return self.browser.title
 
 class DatabasePage(Page):
-    URL = 'http://localhost:5000/database.html'
+    URL = URLs.DATABASE_HOME_PAGE
 
     def __init__(self, browser):
         self.browser = browser
