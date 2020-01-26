@@ -13,3 +13,9 @@ class LinkLocators:
     DATABASE_PAGE_LINK = (By.ID, 'menu_link_database')
     DATABASE_ADD_FILES_LINK = (By.ID, 'menu_link_database_add_files')
 
+class DatabaseAddFileLocators:
+    """A Class for Database Add File page locators"""
+
+    FILE_TO_UPLOAD = (By.ID, 'upload_file')
+    SUBMIT_BUTTON = (By.ID, 'submit_button')
+

@@ -1,5 +1,6 @@
 import functools
 import os
+from os import path
 
 from flask import Blueprint, flash, g, redirect, render_template, request, session, url_for, current_app
 from werkzeug.utils import secure_filename
@@ -33,6 +34,8 @@ def database_add_files():
             return redirect(request.url)
         elif not allowed_filetype(file.filename):
             flash('File type not allowed')
+        elif path.exists(os.path.join(current_app.config['UPLOAD_FOLDER'], secure_filename(file.filename))):
+            flash('Duplicate file: file already in uploads')
         elif file:
             filename = secure_filename(file.filename)
             file.save(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))

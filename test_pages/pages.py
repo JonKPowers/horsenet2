@@ -29,3 +29,19 @@ class DatabasePage(Page):
 
     def get_title(self):
         return self.browser.title
+
+class DatabaseAddFilesPage(Page):
+    URL = URLs.DATABASE_ADD_FILES
+
+    def __init__(self, browser):
+        self.browser = browser
+
+    def load(self, url=URL):
+        self.browser.get(url)
+
+    def get_element(self, locator_tuple):
+        return self.browser.find_element(*locator_tuple)
+
+    def get_title(self):
+        return self.browser.title
+
