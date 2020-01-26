@@ -1,4 +1,8 @@
+from selenium.webdriver.common.by import By
+
 from test_pages.urls import URLs
+
+from test_pages.locators import DatabaseAddFileLocators
 
 class Page:
     def click_link(self, locator_tuple):
@@ -44,4 +48,11 @@ class DatabaseAddFilesPage(Page):
 
     def get_title(self):
         return self.browser.title
+
+    def get_upload_box(self):
+        return self.browser.find_element(*DatabaseAddFileLocators.FILE_TO_UPLOAD_BOX)
+
+    def get_submit_button(self):
+        return self.browser.find_element(*DatabaseAddFileLocators.SUBMIT_BUTTON)
+    
 

@@ -1,10 +1,11 @@
+import os
 import pytest
 import tempfile
 
 from selenium.webdriver.common.by import By
 
 from test_pages.pages import HomePage, DatabaseAddFilesPage
-from tests.locators import LinkLocators, DatabaseAddFileLocators
+from tests.locators import LinkLocators
 
 @pytest.mark.usefixtures('driver_setup')
 class TestDatabaseAddFiles:
@@ -22,30 +23,50 @@ class TestDatabaseAddFiles:
 
         assert 'add file' in add_files_page.get_title().lower()
 
-    def test_can_upload_file_and_rejects_duplicate_upload(self):
-        self.tempfile, self.tempfile_path = tempfile.mkstemp(suffix='.1')
+    def test_can_add_a_file(self):
+        fd, temp_file = tempfile.mkstemp(suffix='.1')
 
         add_files_page = DatabaseAddFilesPage(self.browser)
         add_files_page.load()
 
-        upload_file = add_files_page.get_element(DatabaseAddFileLocators.FILE_TO_UPLOAD)
-        upload_file.send_keys(self.tempfile_path)
+        upload_box = add_files_page.get_upload_box()
+        upload_box.send_keys(temp_file)
 
-        submit_button = add_files_page.get_element(DatabaseAddFileLocators.SUBMIT_BUTTON)
+        submit_button = add_files_page.get_submit_button()
         submit_button.click()
 
-        # First check that file can upload
-        assert 'file saved' in self.browser.find_element(By.ID, 'flash_messages').text.lower()
+        assert 'File saved' in self.browser.find_element(By.ID, 'flash_messages').text
 
+        # Cleanup the temporary file
+        os.close(fd)
+        os.remove(temp_file)
+
+    def test_rejects_duplicate_file(self):
+        fd, temp_file = tempfile.mkstemp(suffix='.1')
+
+        add_files_page = DatabaseAddFilesPage(self.browser)
         add_files_page.load()
 
-        upload_file = add_files_page.get_element(DatabaseAddFileLocators.FILE_TO_UPLOAD)
-        upload_file.send_keys(self.tempfile_path)
+        # First upload should go through with no problem
+        upload_box = add_files_page.get_upload_box()
+        upload_box.send_keys(temp_file)
 
-        submit_button = add_files_page.get_element(DatabaseAddFileLocators.SUBMIT_BUTTON)
+        submit_button = add_files_page.get_submit_button()
         submit_button.click()
 
-        # Then check that upload of file with same file name is rejected
-        assert 'duplicate file' in self.browser.find_element(By.ID, 'flash_messages').text.lower()
+        assert 'File saved' in self.browser.find_element(By.ID, 'flash_messages').text
 
+        # Uploading a second file should be rejected
+        upload_box = add_files_page.get_upload_box()
+        upload_box.send_keys(temp_file)
+
+        submit_button = add_files_page.get_submit_button()
+        submit_button.click()
+
+        assert 'Duplicate file' in self.browser.find_element(By.ID, 'flash_messages').text
+
+        # Cleanup temporary file
+        os.close(fd)
+        os.remove(temp_file)
+        
 
