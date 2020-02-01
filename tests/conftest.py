@@ -26,3 +26,22 @@ def driver_setup(request):
     yield web_driver
     web_driver.quit()
 
+# DB-related imports
+from couchbase.cluster import Cluster
+from couchbase.cluster import PasswordAuthenticator
+
+# DB-related constants
+DB_TEST_BUCKET = 'horsenet_testing'
+DB_CLUSTER = 'couchbase://localhost'
+DB_USER = 'horsenet'
+DB_PASSWORD = 'ABCABC123'
+
+
+# DB fixture for testing db functions outside of webapp
+@pytest.fixture()
+def db_fixture():
+    cluster:Cluster = Cluster(DB_CLUSTER)
+    authenticator:PasswordAuthenticator = PasswordAuthenticator(DB_USER, DB_PASSWORD)
+    cluster.authenticate(authenticator)
+    db = cluster.open_bucket(DB_TEST_BUCKET)
+    return db

@@ -7,7 +7,16 @@ from . import horsenet, database
 def create_app(test_config=None):
     # Create and configure the app
     app = Flask(__name__, instance_relative_config=True)
-    app.config.from_mapping(SECRET_KEY='dev')
+    app.config.from_mapping(
+            SECRET_KEY='dev',
+            DATABASE_CLUSTER = 'couchbase://localhost', 
+            DATABASE_LOGIN = 'horsenet', 
+            DATABASE_PASSWORD = 'ABCABC123', 
+            DATABASE_PROD_BUCKET = 'horsenet_prod', 
+            DATABASE_BUCKET = 'horsenet_testing', 
+            UPLOAD_FOLDER='/data/python/horsenet_2/horse_data',
+            ALLOWED_UPLOAD_EXTENSIONS={'1', '2', '3', '4', '5', '6', 'drf', 'zip'}
+    )
 
     # Load the instance config (if present) when not testing
     # and load the test config if passed in
