@@ -14,6 +14,8 @@ flask-jsonpify = "*"
 pandas = "*"
 selenium = "*"
 couchbase = "*"
+flask-uploads = "*"
+flask-wtf = "*"
 
 [requires]
 python_version = "3.7"

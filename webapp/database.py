@@ -5,6 +5,11 @@ from os import path
 from flask import Blueprint, flash, g, redirect, render_template, request, session, url_for, current_app
 from werkzeug.utils import secure_filename
 
+from flask_uploads import UploadSet, ALL
+from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileRequired
+from wtforms import SubmitField
+
 from webapp.add_files import add_file
 
 bp = Blueprint('database', __name__, url_prefix='/database')
@@ -16,32 +21,29 @@ def database_home():
 def allowed_filetype(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_UPLOAD_EXTENSIONS']
 
+racefiles = UploadSet('racefiles', ALL)
+
+class UploadForm(FlaskForm):
+    racefile = FileField(validators=[FileRequired('Choose a file!')])
+    submit = SubmitField('Upload')
+
 @bp.route('/add_files', methods=['GET', 'POST'])
 def database_add_files():
+    form = UploadForm()
 
     if request.method == 'POST':
-        if 'file' not in request.files:
-            flash('No file part in request')
-            return redirect(request.url)
-        file = request.files['file']
-
-        # Handle if user does not select a file
-        if file.filename == '':
-            flash('No file selected')
-            return redirect(request.url)
-
-        # Only allow permitted filetypes (from current_app.config settings)
-        elif not allowed_filetype(file.filename):
-            flash('File type not allowed')
- 
-        elif file:
-            flash(file.filename)
-            add_file(file)
-            return redirect(url_for('database.database_add_files'))
+        if form.validate_on_submit():
+            for filename in request.files.getlist('racefile'):
+                if not allowed_filetype(filename.filename):
+                    flash(f'Filetype not allowed: {filename.filename}')
+                else:
+                    flash(f'Adding file: {filename.filename}')
+                    add_file(filename)
         else:
-            flash('Hit the end--something went wrong')
+            flash('validate_on_submit() failed')
+        return redirect(url_for('database.database_add_files'))    
 
-    return render_template('database/add_files.html')
+    return render_template('database/add_files.html', form=form)
 
 @bp.route('/file_maintenance')
 def database_file_maintenance():

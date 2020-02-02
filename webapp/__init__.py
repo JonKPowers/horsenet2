@@ -1,8 +1,10 @@
 import os
 
 from flask import Flask
+from flask_uploads import configure_uploads, patch_request_class
 
 from . import horsenet, database
+from .database import racefiles
 
 def create_app(test_config=None):
     # Create and configure the app
@@ -15,7 +17,8 @@ def create_app(test_config=None):
             DATABASE_PROD_BUCKET = 'horsenet_prod', 
             DATABASE_BUCKET = 'horsenet_testing', 
             UPLOAD_FOLDER='/data/python/horsenet_2/horse_data',
-            ALLOWED_UPLOAD_EXTENSIONS={'1', '2', '3', '4', '5', '6', 'drf', 'zip'}
+            ALLOWED_UPLOAD_EXTENSIONS={'1', '2', '3', '4', '5', '6', 'drf', 'zip'},
+            UPLOADED_RACEFILES_DEST = '/data/python/horsenet_2/horse_data'
     )
 
     # Load the instance config (if present) when not testing
@@ -30,6 +33,10 @@ def create_app(test_config=None):
         os.makedirs(app.instance_path)
     except OSError:
         pass
+    
+    # Setup flask-uploads configuration
+    configure_uploads(app, racefiles)
+    patch_request_class(app)
 
     app.register_blueprint(database.bp)
     app.register_blueprint(horsenet.bp)

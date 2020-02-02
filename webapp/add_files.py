@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from webapp.db import get_db
+from webapp.app_settings import ALLOWED_UPLOAD_EXTENSIONS
 
 from flask import current_app, flash, g
 from werkzeug.utils import secure_filename
@@ -22,11 +23,10 @@ def add_file(upload_file, db=None):
             flash('Duplicate DB file record found')
 
 def check_for_duplicate(file_path):
-    flash(file_path)
     return os.path.exists(file_path)
 
 def allowed_filetype(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_UPLOAD_EXTENSIONS
 
 def add_db_record(file_path: str, db=None) -> None:
     if db is None:

@@ -3,7 +3,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from webapp.add_files import add_db_record
+from webapp.add_files import add_db_record, allowed_filetype, check_for_duplicate
 import webapp.app_settings
 import couchbase.subdocument as SD
 from werkzeug.utils import secure_filename
@@ -23,6 +23,13 @@ def zip_test_file():
 
     yield Path(file_path)
 
+    os.close(fd)
+    os.remove(file_path)
+
+@pytest.fixture()
+def nonpermitted_test_file():
+    fd, file_path = tempfile.mkstemp(suffix='.exe')
+    yield Path(file_path)
     os.close(fd)
     os.remove(file_path)
 
@@ -47,10 +54,11 @@ class TestAddFiles():
         finally:
             db_fixture.remove(doc_id, quiet=True)
 
+    def test_rejects_nonpermitted_file_type(self, nonpermitted_test_file, db_fixture):
+        assert allowed_filetype(str(nonpermitted_test_file)) == False
 
-
-
-
+    def test_checks_for_duplicate_file(self, plain_test_file, db_fixture):
+        assert check_for_duplicate(str(plain_test_file)) == True
 
 
 
