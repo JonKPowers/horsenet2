@@ -16,6 +16,6 @@ class LinkLocators:
 class DatabaseAddFileLocators:
     """A Class for Database Add File page locators"""
 
-    FILE_TO_UPLOAD = (By.ID, 'upload_file')
+    FILE_TO_UPLOAD = (By.ID, 'racefile')
     SUBMIT_BUTTON = (By.ID, 'submit_button')
 

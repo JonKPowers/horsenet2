@@ -48,3 +48,7 @@ def database_add_files():
 @bp.route('/file_maintenance')
 def database_file_maintenance():
     return render_template('database/file_maintenance.html')
+
+@bp.route('/zip_files')
+def database_zip_files():
+    return render_template('database/zip_files.html')
