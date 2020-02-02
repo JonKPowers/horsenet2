@@ -33,7 +33,7 @@ def add_db_record(file_path: str, db=None) -> None:
         db = get_db()
     file = Path(file_path)
     record = get_formatted_record(file)
-    db.insert(file.name, record)
+    db.insert(secure_filename(file.name), record)
 
 def get_formatted_record(file: Path) -> dict:
     is_zip = file.suffix == '.zip'
