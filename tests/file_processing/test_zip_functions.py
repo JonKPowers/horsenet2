@@ -2,10 +2,12 @@ import pytest
 from zipfile import ZipFile
 import tempfile
 from pathlib import Path
+import random
 import os
 
-from webapp.zip_functions import get_file_list, unzip_file, same_file
+from webapp.zip_functions import get_file_list, unzip_files, extract_file, same_file
 from webapp.zip_functions import file_already_in_uploads, get_unique_filename
+from webapp.zip_functions import extract_and_check_if_same
 from webapp.app_settings import UPLOAD_FOLDER
 
 class TestZipFunctions:
@@ -20,7 +22,7 @@ class TestZipFunctions:
     def test_unzips_files_to_upload_dir(self, zipped_files):
         """Tests that files are unloaded into the UPLOAD_FOLDER"""
         zip_file, zipped_file_names = zipped_files
-        unzip_file(zip_file)
+        unzip_files(zip_file)
         
         try:
             for file in zipped_file_names:
@@ -30,6 +32,26 @@ class TestZipFunctions:
         finally:
             for file in zipped_file_names:
                 Path(UPLOAD_FOLDER, file).unlink()
+
+    def test_unzips_single_file_to_upload_fie(self, zipped_files):
+        """Tests ability to extract a single file from a zip into the UPLOAD_FOLDER"""
+        zip_file, zipped_file_names = zipped_files
+        file_to_get = zipped_file_names[random.randrange(3)]
+
+        extract_file(zip_file, file_to_get)
+        extracted_file = Path(UPLOAD_FOLDER, file_to_get)
+
+        try:
+            assert extracted_file.exists()
+        finally:
+            if extracted_file.exists():
+                extracted_file.unlink()
+
+    def test_extracts_and_identifies_duplicate_files(self, duplicate_in_zip):
+        """Tests ability to extract file from ZipFile and compare it to an existing file"""
+        zip_file, duplicate_file, zip_contents = duplicate_in_zip
+
+        assert extract_and_check_if_same(zip_file, zip_contents[random.randrange(3)], duplicate_file)
 
     def test_identifies_duplicate_files(self, duplicate_files, nonduplicate_files):
         """Tests ability to distinguish files that have the same or different contents."""

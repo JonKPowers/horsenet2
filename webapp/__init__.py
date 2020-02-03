@@ -3,8 +3,7 @@ import os
 from flask import Flask
 from flask_uploads import configure_uploads, patch_request_class
 
-from . import horsenet, database
-import webapp.app_settings
+from . import horsenet, database, app_settings
 from .database import racefiles
 
 def create_app(test_config=None):
