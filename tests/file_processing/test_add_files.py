@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 from webapp.add_files import add_db_record, allowed_filetype, check_for_duplicate
+from webapp.add_files import get_formatted_record
 import webapp.app_settings
 import couchbase.subdocument as SD
 from werkzeug.utils import secure_filename
@@ -44,6 +45,7 @@ class TestAddFiles():
         finally:
             db_fixture.remove(doc_id, quiet=True)
 
+    @pytest.mark.skip()
     def test_marks_db_record_for_zip(self, zip_test_file, db_fixture):
         add_db_record(str(zip_test_file), db_fixture)
         doc_id = secure_filename(str(zip_test_file.name))
@@ -53,6 +55,12 @@ class TestAddFiles():
             assert result[0] is True
         finally:
             db_fixture.remove(doc_id, quiet=True)
+
+    def test_adds_zip_file_contents_to_record(self, zipped_files):
+        zip_file, zip_contents = zipped_files
+        record = get_formatted_record(zip_file)
+
+        assert record['zip_contents'] == zip_contents
 
     def test_rejects_nonpermitted_file_type(self, nonpermitted_test_file, db_fixture):
         assert allowed_filetype(str(nonpermitted_test_file)) == False

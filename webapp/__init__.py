@@ -4,6 +4,7 @@ from flask import Flask
 from flask_uploads import configure_uploads, patch_request_class
 
 from . import horsenet, database
+import webapp.app_settings
 from .database import racefiles
 
 def create_app(test_config=None):
@@ -16,8 +17,8 @@ def create_app(test_config=None):
             DATABASE_PASSWORD = 'ABCABC123', 
             DATABASE_PROD_BUCKET = 'horsenet_prod', 
             DATABASE_BUCKET = 'horsenet_testing', 
-            UPLOAD_FOLDER='/data/python/horsenet_2/horse_data',
-            ALLOWED_UPLOAD_EXTENSIONS={'1', '2', '3', '4', '5', '6', 'drf', 'zip'},
+            UPLOAD_FOLDER=app_settings.UPLOAD_FOLDER,
+            ALLOWED_UPLOAD_EXTENSIONS=app_settings.ALLOWED_UPLOAD_EXTENSIONS,
             UPLOADED_RACEFILES_DEST = '/data/python/horsenet_2/horse_data'
     )
 

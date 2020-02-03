@@ -11,6 +11,7 @@ from flask_wtf.file import FileField, FileRequired
 from wtforms import SubmitField
 
 from webapp.add_files import add_file
+from webapp.db import get_db
 
 bp = Blueprint('database', __name__, url_prefix='/database')
 
@@ -51,4 +52,14 @@ def database_file_maintenance():
 
 @bp.route('/zip_files')
 def database_zip_files():
-    return render_template('database/zip_files.html')
+    db = get_db()
+    results = db.n1ql_query('SELECT * FROM horsenet_testing WHERE doc_type="file" and zip_file=true')
+    zip_files = [item['horsenet_testing'] for item in results]
+    return render_template('database/zip_files.html', zip_files=zip_files)
+
+@bp.route('/unzip_file/<string:file_name>')
+def unzip_file(file_name):
+    flash(f'Unzipping {file_name}')
+    return redirect(url_for('database.database_zip_files'))
+    pass
+

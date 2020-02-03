@@ -3,6 +3,7 @@ import hashlib
 from pathlib import Path
 from webapp.db import get_db
 from webapp.app_settings import ALLOWED_UPLOAD_EXTENSIONS
+from webapp import zip_functions
 
 from flask import current_app, flash, g
 from werkzeug.utils import secure_filename
@@ -43,18 +44,19 @@ def get_formatted_record(file: Path) -> dict:
             'zip_file': is_zip,
             'file_name': file.name,
             'file_path': str(file),
-            'file_hash': hash_file(str(file)),
+            'file_hash': get_hash(file),
             'preprocessed': False,
             'processed': False,
             }
     if is_zip:
         record['unzipped'] = False
+        record['zip_contents'] = zip_functions.get_file_list(file)
     return record
 
-def hash_file(file_path: str) -> str:
+def get_hash(file: Path) -> str:
     BLOCK_SIZE = 65536
     file_hash = hashlib.sha256()
-    with open(file_path, 'rb') as f:
+    with open(file, 'rb') as f:
         fb = f.read(BLOCK_SIZE)
         while len(fb) > 0:
             file_hash.update(fb)
