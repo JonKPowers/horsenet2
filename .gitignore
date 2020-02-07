@@ -5,3 +5,4 @@ assets
 *.html
 *.swp
 horse_data/
+inbound_horse_data/
