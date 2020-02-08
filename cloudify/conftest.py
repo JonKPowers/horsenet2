@@ -24,8 +24,6 @@ def horse_duplicates_same_contents():
         for file in zipped_file_paths:
             with open(file, 'w') as f:
                 f.write(random_data)
-
-        print(f'File 1: {file_1} - File 2: {file_2}')
         yield file_1, file_2
 
     pass
@@ -55,18 +53,59 @@ def horse_looks_dupe_diff_contents():
         for file in zipped_file_paths:
             with open(file, 'w') as f:
                 f.write(str(random.getrandbits(2048)))
-
-        print(f'File 1: {file_1} - File 2: {file_2}')
         yield file_1, file_2
 
     pass
 
 @pytest.fixture()
-def zipped_files():
-    zipped_file_paths: list = list()
-    zipped_file_descriptors: list = list()
+def zipped_needs_years_file():
+    year: str = str(random.randrange(2000, 2040))
+    file_contents: str = f'"Test","{year}1234","Test","Test","Test",\n' \
+                         f'"Test","{year}5678","Test","Test","Test",'
+    temp_descriptors: list = list()
+    temp_paths: List[Path] = list()
 
-    for _ in range(3):
+    # Create and set up the zip file
+    z_fd, z_fp = tempfile.mkstemp(suffix='123k.zip')
+    zip_file = Path(z_fp)
+    temp_descriptors.append(z_fd)
+    temp_paths.append(zip_file)
+
+    # Create and set up the zipped files (should be just one but want to be able to handle multiple)
+    for _ in range(random.randrange(1, 10)):
+        fd, fp = tempfile.mkstemp(suffix='123.DRF')
+        temp_descriptors.append(fd)
+        temp_paths.append(Path(fp))
+        # Drop in dummy file contents
+        with open(fp, 'w') as file:
+            file.write(file_contents)
+
+    # Zip up the files and return the zip, a list of contents, and the target year
+    with ZipFile(zip_file, mode='w') as z:
+        for item in temp_paths[1:]:
+            z.write(item, arcname=item.name)
+
+    yield zip_file, temp_paths[1:], year
+
+    # Cleanup
+    for fd in temp_descriptors:
+        os.close(fd)
+
+    for file in temp_paths:
+        try:
+            file.unlink()
+        except:
+            pass
+
+    
+@pytest.fixture()
+def zipped_files():
+    zipped_file_paths: List[Path] = list()
+    zipped_file_descriptors: list = list()
+    num_files = random.randrange(1, 200)
+    print(num_files)
+
+    for _ in range(num_files):
         fd, fp = tempfile.mkstemp()
         zipped_file_descriptors.append(fd)
         zipped_file_paths.append(Path(fp))

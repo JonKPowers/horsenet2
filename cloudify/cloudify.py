@@ -33,10 +33,8 @@ def process_inbound_dir() -> None:
 
 def is_a_duplicate(file: Path) -> bool:
     possible_dupe = re.search(r'(\w*) ?\(\d+\)', file.name)
-    print(possible_dupe)
     if possible_dupe:
         possible_original = Path(file.parents[0], possible_dupe.group(1) + file.suffix)
-        print(possible_original)
         if possible_original.exists() and is_same_file(possible_original, file):
             return True
     return False
@@ -68,7 +66,6 @@ def unzip_add_year(zip_file: Path, dir: str, s3) -> None:
         path = zipf.extract(file, path=dir)
         file_parts = file.split('.')
         fixed_file = file_parts[0] + year + '.' + file_parts[1]
-        print(f'Original: {file} - Fixed:{fixed_file}')
         try:
             s3.upload_file(path, BUCKET, EXTRACTED_FOLDER + '/' + fixed_file)
         except:
@@ -80,19 +77,40 @@ def unzip_add_year(zip_file: Path, dir: str, s3) -> None:
     except:
         logging.error(f'Upload failed: {zip_file}')
 
-def unzip(zip_file: Path, dir: str, s3) -> None:
+def unzip(zip_file: Path, dir: str) -> List[Path]:
+    """Unzips file contents into specified directory. Adds year identifier to DRF files."""
+
+    year = ''
+    if zip_file.stem.endswith('k'):
+        year = get_year_info(zip_file)
+    corrected_zip_file = Path(zip_file.parents[0], zip_file.stem + year + zip_file.suffix)
+
     zipf = ZipFile(zip_file)
     zipped_files = zipf.namelist()
+    unzipped_files: List[Path] = list()
+
     for file in zipped_files:
-        path = zipf.extract(file, path=dir)
-        try:
-            s3.upload_file(path, BUCKET, EXTRACTED_FOLDER + '/' + file)
-        except:
-            logging.error(f'Upload failed: {file}')
+        unzipped_file = zipf.extract(file, path=dir)
+        unzipped_file = Path(unzipped_file)
+        correct_path = Path(dir, unzipped_file.stem + year + unzipped_file.suffix)
+        if not correct_path.exists():
+            unzipped_file.rename(correct_path)
+        unzipped_files.append(correct_path)
+
+    if not corrected_zip_file.exists():
+        zip_file.rename(corrected_zip_file)
+
+    return unzipped_files
+
+def upload(file_path: str, bucket: str, destination_path: str, s3):
+    try:
+        s3.upload_file(path, BUCKET, EXTRACTED_FOLDER + '/' + file)
+    except Exception as e:
+        logging.error(f'Upload failed: {file}: {e}')
     try:
         s3.upload_file(str(zip_file), BUCKET, ZIP_FOLDER + '/' + zip_file.name)
-    except:
-        logging.error(f'Upload failed: {zip_file.name}')
+    except Exception as e:
+        logging.error(f'Upload failed: {zip_file.name}: {e}')
 
 def get_year_info(zip_file: Path) -> str:
     zipped_files: list = ZipFile(zip_file).namelist()
