@@ -14,6 +14,7 @@ INBOUND_DIR = '/data/python/horsenet_2/inbound_horse_data'
 BUCKET = 'horsenet-data-files'
 ZIP_FOLDER = 'zip-files'
 EXTRACTED_FOLDER = 'extracted-files'
+s3 = boto3.client('s3')
 
 def process_inbound_dir() -> None:
     # First get rid of duplicates in INBOUND_DIR
@@ -30,8 +31,18 @@ def process_inbound_dir() -> None:
             
             assert False # FINISH THE THIS. PUT UNZIP PROCESS IN SEPARATE FUNCTION
 
+def get_file_list(dir: str, dupes_only=False) -> List[Path]:
+    def return_file(file: Path) -> bool:
+        if not file.is_file():
+            return False
+        elif dupes_only and re.search(r' ?\(\d\)', file.stem) is None:
+            return False
+        return True
 
 def is_a_duplicate(file: Path) -> bool:
+    """Checks whether potential duplicate file (format XXXXX(\\d+).XXX) is truly a dupe.
+
+    First checks whether file without (\\d+) exists. If it does, checks whether they have the same file content."""
     possible_dupe = re.search(r'(\w*) ?\(\d+\)', file.name)
     if possible_dupe:
         possible_original = Path(file.parents[0], possible_dupe.group(1) + file.suffix)
@@ -40,42 +51,17 @@ def is_a_duplicate(file: Path) -> bool:
     return False
 
 def is_same_file(file1: Path, file2: Path) -> bool:
-    file1_hash: str = None
-    file2_hash: str = None
-    with open(file1, 'rb') as file:
-        file1_hash = hashlib.md5(file.read()).hexdigest()
-    with open(file2, 'rb') as file:
-        file2_hash = hashlib.md5(file.read()).hexdigest()
-
+    file1_hash: str = get_md5(file1)
+    file2_hash: str = get_md5(file2)
     return file1_hash == file2_hash
 
+def get_md5(file: Path) -> str:
+    with open(file, 'rb') as f:
+        return hashlib.md5(f.read()).hexdigest()
 
-def get_file_list(dir: str, dupes_only=False) -> List[Path]:
+
     files: List[Path] = [Path(dir, file) for file in os.listdir(dir)]
-    file_list = [file for file in file_list if file.is_file()]
-    if dupes_only:
-        file_list = [file for file in file_list if re.search(r' ?\(\d\)', file.stem)]
-    return file_list
-
-def unzip_add_year(zip_file: Path, dir: str, s3) -> None:
-    zipf = ZipFile(zip_file)
-    zipped_files = zipf.namelist()
-    year = get_year_info(zip_file)
-
-    for file in zipped_files:
-        path = zipf.extract(file, path=dir)
-        file_parts = file.split('.')
-        fixed_file = file_parts[0] + year + '.' + file_parts[1]
-        try:
-            s3.upload_file(path, BUCKET, EXTRACTED_FOLDER + '/' + fixed_file)
-        except:
-            logging.error(f'Upload failed: {fixed_File}')
-
-    fixed_zip_file = zip_file.stem + year + zip_file.suffix
-    try:
-        s3.upload_file(str(zip_file), BUCKET, ZIP_FOLDER + '/' + fixed_zip_file)
-    except:
-        logging.error(f'Upload failed: {zip_file}')
+    return [file for file in file_list if return_file(file)]
 
 def unzip(zip_file: Path, dir: str) -> List[Path]:
     """Unzips file contents into specified directory. Adds year identifier to DRF files."""
@@ -102,15 +88,14 @@ def unzip(zip_file: Path, dir: str) -> List[Path]:
 
     return unzipped_files
 
-def upload(file_path: str, bucket: str, destination_path: str, s3):
+def upload(file: Path, bucket: str, destination_path: str=''):
+    upload_path: str = ''
+    if destination_path:
+        upload_path += destination_path + '/'
     try:
-        s3.upload_file(path, BUCKET, EXTRACTED_FOLDER + '/' + file)
+        s3.upload_file(str(file), bucket, upload_path + file.name)
     except Exception as e:
         logging.error(f'Upload failed: {file}: {e}')
-    try:
-        s3.upload_file(str(zip_file), BUCKET, ZIP_FOLDER + '/' + zip_file.name)
-    except Exception as e:
-        logging.error(f'Upload failed: {zip_file.name}: {e}')
 
 def get_year_info(zip_file: Path) -> str:
     zipped_files: list = ZipFile(zip_file).namelist()

@@ -3,7 +3,7 @@ import boto3
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
-from cloudify import is_a_duplicate, unzip
+from cloudify import is_a_duplicate, unzip, upload
 
 class TestCloudFunctions():
     def test_recognizes_duplicate_files(self, horse_duplicates_same_contents):
@@ -65,10 +65,22 @@ class TestCloudFunctions():
                 except:
                     pass
 
-    def test_uploads_file_to_s3(self):
-        assert False
+    def test_uploads_file_to_s3(self, plain_test_file: Path):
+        test_bucket = 'horsenet-testing'
+        destination_folder = 'test'
+        upload_path = ''
+        s3 = boto3.client('s3')
+        
+        upload(plain_test_file, test_bucket, destination_folder)
 
-    @pytest.mark.skip()
+        if destination_folder:
+            upload_path += destination_folder + '/'
+        
+        # Will throw a botocore.errorfactory.ClientError
+        s3.head_object(Bucket=test_bucket, Key=upload_path + plain_test_file.name)
+        
+        s3.delete_object(Bucket=test_bucket, Key=upload_path + plain_test_file.name)
+
     def test_sends_md5_hash_with_file(self):
         assert False
 

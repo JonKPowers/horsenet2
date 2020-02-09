@@ -199,6 +199,9 @@ def nonduplicate_files():
 def plain_test_file():
     fd, file_path = tempfile.mkstemp(suffix='.1')
 
+    with open(file_path, 'w') as file:
+        file.write(str(random.getrandbits(128)))
+
     yield Path(file_path)
 
     os.close(fd)
