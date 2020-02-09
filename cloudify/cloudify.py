@@ -8,6 +8,7 @@ import boto3
 from typing import List
 from tempfile import TemporaryDirectory
 import csv
+import base64
 
 
 INBOUND_DIR = '/data/python/horsenet_2/inbound_horse_data'
@@ -39,6 +40,9 @@ def get_file_list(dir: str, dupes_only=False) -> List[Path]:
             return False
         return True
 
+    files: List[Path] = [Path(dir, file) for file in os.listdir(dir)]
+    return [file for file in file_list if return_file(file)]
+
 def is_a_duplicate(file: Path) -> bool:
     """Checks whether potential duplicate file (format XXXXX(\\d+).XXX) is truly a dupe.
 
@@ -56,12 +60,10 @@ def is_same_file(file1: Path, file2: Path) -> bool:
     return file1_hash == file2_hash
 
 def get_md5(file: Path) -> str:
+    hash:str = None
     with open(file, 'rb') as f:
-        return hashlib.md5(f.read()).hexdigest()
-
-
-    files: List[Path] = [Path(dir, file) for file in os.listdir(dir)]
-    return [file for file in file_list if return_file(file)]
+        hash = hashlib.md5(f.read()).digest()
+    return base64.b64encode(hash).decode('utf-8')
 
 def unzip(zip_file: Path, dir: str) -> List[Path]:
     """Unzips file contents into specified directory. Adds year identifier to DRF files."""
@@ -93,7 +95,10 @@ def upload(file: Path, bucket: str, destination_path: str=''):
     if destination_path:
         upload_path += destination_path + '/'
     try:
-        s3.upload_file(str(file), bucket, upload_path + file.name)
+        md5 = get_md5(file)
+        with open(file, 'rb') as data:
+            s3.put_object(Bucket=bucket, Key=upload_path + file.name, 
+                    Body=data, ContentMD5=md5, Metadata={'md5chksum': md5})
     except Exception as e:
         logging.error(f'Upload failed: {file}: {e}')
 

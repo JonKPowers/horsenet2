@@ -67,7 +67,7 @@ class TestCloudFunctions():
 
     def test_uploads_file_to_s3(self, plain_test_file: Path):
         test_bucket = 'horsenet-testing'
-        destination_folder = 'test'
+        destination_folder = ''
         upload_path = ''
         s3 = boto3.client('s3')
         
@@ -79,10 +79,19 @@ class TestCloudFunctions():
         # Will throw a botocore.errorfactory.ClientError
         s3.head_object(Bucket=test_bucket, Key=upload_path + plain_test_file.name)
         
-        s3.delete_object(Bucket=test_bucket, Key=upload_path + plain_test_file.name)
+        # s3.delete_object(Bucket=test_bucket, Key=upload_path + plain_test_file.name)
 
-    def test_sends_md5_hash_with_file(self):
-        assert False
+    def test_sends_md5_hash_with_file(self, plain_test_file):
+        test_bucket = 'horsenet-testing'
+        s3 = boto3.client('s3')
+        
+        upload(plain_test_file, test_bucket)
+
+        response = s3.head_object(Bucket=test_bucket, Key=plain_test_file.name)
+
+        assert 'md5chksum' in response['Metadata']
+        
+        
 
     @pytest.mark.skip()
     def test_can_scan_for_duplicate_md5_hashes(self):
