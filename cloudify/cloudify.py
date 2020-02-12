@@ -94,13 +94,32 @@ def upload(file: Path, bucket: str, destination_path: str=''):
     upload_path: str = ''
     if destination_path:
         upload_path += destination_path + '/'
+    if s3_duplicate(file, bucket, upload_path):
+        return False
     try:
         md5 = get_md5(file)
         with open(file, 'rb') as data:
             s3.put_object(Bucket=bucket, Key=upload_path + file.name, 
                     Body=data, ContentMD5=md5, Metadata={'md5chksum': md5})
+        return True
+
     except Exception as e:
         logging.error(f'Upload failed: {file}: {e}')
+        return False
+
+def s3_duplicate(file: Path, bucket: str, destination_path: str=''):
+    s3_path: str = ''
+    if destination_path:
+        s3_path += destination_path + '/'
+
+    try:
+        response = s3.head_object(Bucket=bucket, Key=s3_path+file.name)
+        if get_md5(file) == response['Metadata']['md5chksum']:
+            return True
+    except Exception as e:
+        logging.error(e)
+
+    return False
 
 def get_year_info(zip_file: Path) -> str:
     zipped_files: list = ZipFile(zip_file).namelist()
@@ -112,3 +131,15 @@ def get_year_info(zip_file: Path) -> str:
     date_string = csv_line[1] # Date string is in 2nd position
     year = date_string[0:4] # Format will be YYYYMMDD
     return year
+
+def already_in_bucket(s3_path: str, bucket: str) -> bool:
+    try:
+        s3.head_object(Bucket=bucket, Key=s3_path)
+        return True
+    except Exception as e:
+        logging.error(e)
+        return False
+
+        
+
+

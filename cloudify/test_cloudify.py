@@ -3,7 +3,8 @@ import boto3
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
-from cloudify import is_a_duplicate, unzip, upload
+from cloudify import is_a_duplicate, unzip, upload, already_in_bucket
+from cloudify import s3_duplicate
 
 class TestCloudFunctions():
     def test_recognizes_duplicate_files(self, horse_duplicates_same_contents):
@@ -79,36 +80,89 @@ class TestCloudFunctions():
         # Will throw a botocore.errorfactory.ClientError
         s3.head_object(Bucket=test_bucket, Key=upload_path + plain_test_file.name)
         
-        # s3.delete_object(Bucket=test_bucket, Key=upload_path + plain_test_file.name)
+        s3.delete_object(Bucket=test_bucket, Key=upload_path + plain_test_file.name)
 
     def test_sends_md5_hash_with_file(self, plain_test_file):
         test_bucket = 'horsenet-testing'
         s3 = boto3.client('s3')
         
-        upload(plain_test_file, test_bucket)
+        assert upload(plain_test_file, test_bucket)
 
         response = s3.head_object(Bucket=test_bucket, Key=plain_test_file.name)
 
         assert 'md5chksum' in response['Metadata']
-        
-        
 
+        try:
+            s3.delete_object(Bucket=test_bucket, Key=plain_test_file.name)
+        except:
+            pass
+        
     @pytest.mark.skip()
     def test_can_scan_for_duplicate_md5_hashes(self):
         assert False
 
-    @pytest.mark.skip()
-    def test_recognizes_duplicate_in_bucket(self):
-        assert False
+    def test_recognizes_duplicate_in_bucket(self, plain_test_file):
+        upload_path = plain_test_file.name
+        test_bucket = 'horsenet-testing'
 
-    @pytest.mark.skip()
-    def test_will_not_upload_duplicate(self):
-        assert False
+        s3 = boto3.client('s3')
+        try:
+            s3.upload_file(str(plain_test_file), Bucket=test_bucket, Key=upload_path)
+        except Exception as e:
+            assert False, 'Error setting up test file in S3'
+        
+        assert already_in_bucket(upload_path, test_bucket)
 
-    @pytest.mark.skip()
-    def test_adds_year_to_drf_files(self):
-        assert False
+        try: 
+            s3.delete_object(Bucket=test_bucket, Key=upload_path)
+        except Exception as e:
+            logging.error(e)
 
-    @pytest.mark.skip()
-    def test_gets_year_from_csv(self):
-        assert False
+        assert not already_in_bucket(s3_path=upload_path, bucket=test_bucket)
+
+    def test_recognizes_s3_duplicate(self, plain_test_file):
+        test_bucket = 'horsenet-testing'
+        s3 = boto3.client('s3')
+
+        assert not s3_duplicate(file=plain_test_file, bucket=test_bucket)
+        assert upload(file=plain_test_file, bucket=test_bucket)
+        assert s3_duplicate(file=plain_test_file, bucket=test_bucket)
+
+        try:
+            s3.delete_object(Bucket=test_bucket, Key=plain_test_file.name)
+        except:
+            pass
+
+    def test_recognizes_s3_nonduplicate(self, same_name_diff_contents):
+        test_bucket = 'horsenet-testing'
+        s3 = boto3.client('s3')
+
+        file_1, file_2 = same_name_diff_contents
+        assert file_1.name == file_2.name
+        assert upload(file=file_1, bucket=test_bucket)
+        assert not s3_duplicate(file=file_2, bucket=test_bucket)
+
+        try:
+            s3.boto3.client('s3').delete_object(Bucket=test_bucket, Key=file_1.name)
+        except:
+            pass
+
+    def test_will_not_upload_duplicate(self, plain_test_file):
+        test_bucket = 'horsenet-testing'
+        
+        assert upload(file=plain_test_file, bucket=test_bucket)
+        assert not upload(file=plain_test_file, bucket=test_bucket)
+
+        try:
+            s3.boto3.client('s3').delete_object(Bucket=test_bucket, Key=plain_test_file.name)
+        except:
+            pass
+
+    def test_uploads_all_files_in_folder(self, folder_of_files):
+        assert False, 'Finish the tests'
+
+    def test_deletes_files_after_upload(self, folder_of_files):
+        pass
+
+    def test_deletes_duplicates_in_upload_folder(self, folder_of_files):
+        pass

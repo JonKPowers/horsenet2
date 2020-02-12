@@ -7,6 +7,52 @@ import os
 from typing import List
 
 @pytest.fixture()
+def folder_of_files():
+    num_files = random.randint(10, 100)
+    file_descriptors: list = list()
+    zip_files: List[Path] = list()
+    zipped_files: List[Path] = list()
+
+    # Create the random files to zip up
+    for _ in range(num_files):
+        fd, fp = tempfile.mkstemp(suffix='.'+str(random.randint(1, 6)))
+        file_descriptors.append(fd)
+        zipped_files.append(Path(fp))
+        with open(fp, 'w') as f:
+            f.write(str(random.getrandbits(random.randint(512, 1024))))
+
+    # Zip up the files, 1-6 files per zip
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file_counter = 0
+        assert num_files == len(zipped_files)
+        while file_counter < num_files:
+            finish_up = num_files - file_counter <= 6
+            num_to_zip = num_files - file_counter if finish_up else random.randint(1, 6)
+            fd, fp = tempfile.mkstemp(suffix='.zip', dir=temp_dir)
+            file_descriptors.append(fd)
+            file_path = Path(fp)
+            zip_files.append(file_path)
+            for _ in range(num_to_zip):
+                file_to_add = zipped_files[file_counter]
+                file_counter += 1
+                with ZipFile(file_path, mode='w') as zf:
+                    zf.write(file_to_add, arcname=file_to_add.name)
+        assert file_counter == num_files
+        print(f'{len(zipped_files)} zipped files {len(zip_files)} zip files') 
+
+        yield temp_dir, zip_files, zipped_files
+
+    for fd in file_descriptors:
+        os.close(fd)
+
+    for fp in zipped_files:
+        try:
+            fp.unlink()
+        except:
+            pass
+
+
+@pytest.fixture()
 def horse_duplicates_same_contents():
     zipped_file_descriptors: list = list()
     zipped_file_paths: List[Path] = list()
@@ -26,8 +72,32 @@ def horse_duplicates_same_contents():
                 f.write(random_data)
         yield file_1, file_2
 
-    pass
+@pytest.fixture()
+def same_name_diff_contents():
+    file_descriptors: list = list()
+    files: List[Path] = list()
 
+    fd, fp = tempfile.mkstemp()
+    file_1 = Path(fp)
+    file_descriptors.append(fd)
+    files.append(file_1)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file_2 = Path(temp_dir, file_1.name)
+        files.append(file_2)
+        for file in files:
+            with open(file, 'w') as f:
+                f.write(str(random.getrandbits(512)))
+        yield file_1, file_2
+
+    for descriptor in file_descriptors:
+        os.close(descriptor)
+    for file in files:
+        try:
+            file.unlink()
+        except:
+            pass
+    
 @pytest.fixture()
 def horse_looks_like_dupe():
     fd, fp = tempfile.mkstemp(suffix= '(' + str(random.randrange(2000)) + ').zip')
