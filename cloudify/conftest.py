@@ -8,10 +8,12 @@ from typing import List
 
 @pytest.fixture()
 def folder_of_files():
-    num_files = random.randint(10, 100)
+    num_files = random.randint(10, 20)
     file_descriptors: list = list()
     zip_files: List[Path] = list()
     zipped_files: List[Path] = list()
+    file_contents: str = f'"Test","20201234","Test","Test","Test",\n' \
+                         f'"Test","20205678","Test","Test","Test",'
 
     # Create the random files to zip up
     for _ in range(num_files):
@@ -19,7 +21,7 @@ def folder_of_files():
         file_descriptors.append(fd)
         zipped_files.append(Path(fp))
         with open(fp, 'w') as f:
-            f.write(str(random.getrandbits(random.randint(512, 1024))))
+            f.write(file_contents)
 
     # Zip up the files, 1-6 files per zip
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -28,17 +30,16 @@ def folder_of_files():
         while file_counter < num_files:
             finish_up = num_files - file_counter <= 6
             num_to_zip = num_files - file_counter if finish_up else random.randint(1, 6)
-            fd, fp = tempfile.mkstemp(suffix='.zip', dir=temp_dir)
+            fd, fp = tempfile.mkstemp(suffix='a.zip', dir=temp_dir)
             file_descriptors.append(fd)
             file_path = Path(fp)
             zip_files.append(file_path)
-            for _ in range(num_to_zip):
-                file_to_add = zipped_files[file_counter]
-                file_counter += 1
-                with ZipFile(file_path, mode='w') as zf:
+            with ZipFile(file_path, mode='w') as zf:
+                for _ in range(num_to_zip):
+                    file_to_add = zipped_files[file_counter]
+                    file_counter += 1
                     zf.write(file_to_add, arcname=file_to_add.name)
         assert file_counter == num_files
-        print(f'{len(zipped_files)} zipped files {len(zip_files)} zip files') 
 
         yield temp_dir, zip_files, zipped_files
 

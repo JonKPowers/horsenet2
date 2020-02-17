@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 from pathlib import Path
 
 from cloudify import is_a_duplicate, unzip, upload, already_in_bucket
-from cloudify import s3_duplicate
+from cloudify import s3_duplicate, unzip_and_upload, is_in_s3, get_year_info
 
 class TestCloudFunctions():
     def test_recognizes_duplicate_files(self, horse_duplicates_same_contents):
@@ -143,7 +143,7 @@ class TestCloudFunctions():
         assert not s3_duplicate(file=file_2, bucket=test_bucket)
 
         try:
-            s3.boto3.client('s3').delete_object(Bucket=test_bucket, Key=file_1.name)
+            s3.delete_object(Bucket=test_bucket, Key=file_1.name)
         except:
             pass
 
@@ -154,12 +154,38 @@ class TestCloudFunctions():
         assert not upload(file=plain_test_file, bucket=test_bucket)
 
         try:
-            s3.boto3.client('s3').delete_object(Bucket=test_bucket, Key=plain_test_file.name)
+            boto3.client('s3').delete_object(Bucket=test_bucket, Key=plain_test_file.name)
         except:
             pass
 
     def test_uploads_all_files_in_folder(self, folder_of_files):
-        assert False, 'Finish the tests'
+        def fix_file_name(file: Path) -> Path:
+            if file.stem.endswith('k'):
+                year = get_year_info(file)
+                return Path(file.parents[0], file.stem + year + file.suffix)
+            return file
+
+        test_bucket = 'horsenet-testing'
+        test_dir, zip_files, zipped_files = folder_of_files
+        s3 = boto3.client('s3')
+
+        # Fix up files names to reflect year that will be added
+        zip_files = [fix_file_name(file) for file in zip_files]
+
+        # Run the unzip/upload function
+        unzip_and_upload(dir=test_dir, bucket=test_bucket)
+
+        # See if it worked
+        for file in zip_files:
+            assert is_in_s3(file=file, bucket=test_bucket, destination_path='zip-files')
+            s3.delete_object(Bucket=test_bucket, Key='zip-files/'+file.name)
+        
+        for file in zipped_files:
+            assert is_in_s3(file=file, bucket=test_bucket, destination_path='extracted-files')
+            s3.delete_object(Bucket=test_bucket, Key='extracted-files/'+file.name)
+
+    def test_doesnt_upload_duplicate_file(self):
+        pass
 
     def test_deletes_files_after_upload(self, folder_of_files):
         pass

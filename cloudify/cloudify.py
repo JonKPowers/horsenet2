@@ -5,7 +5,7 @@ from pathlib import Path
 import hashlib
 import logging
 import boto3
-from typing import List
+from typing import List, Tuple
 from tempfile import TemporaryDirectory
 import csv
 import base64
@@ -27,10 +27,25 @@ def process_inbound_dir() -> None:
     # Next unzip the remaining files and upload them along with the original zip
     s3 = boto3.client('s3')
     file_list: List[Path] = get_file_list(INBOUND_DIR)
-    with tempfile.TemporaryDirectory() as temp_dir:
+    with TemporaryDirectory() as temp_dir:
         for file in file_list:
             
             assert False # FINISH THE THIS. PUT UNZIP PROCESS IN SEPARATE FUNCTION
+
+def unzip_and_upload(dir: str, bucket: str) -> bool:
+    # First process all the zip files
+    files = get_file_list(dir)
+    files = [file for file in files if file.suffix.lower() == '.zip']
+
+    with TemporaryDirectory() as temp_dir:
+        for file in files:
+            zip_file, unzipped_files = unzip(file, temp_dir)
+            for unzipped_file in unzipped_files:
+                #if s3_duplicate(file=unzipped_file.name, bucket=bucket, destination_path='extracted-files'):
+                assert upload(file=unzipped_file, bucket=bucket, destination_path=EXTRACTED_FOLDER)
+            assert upload(file=zip_file, bucket=bucket, destination_path=ZIP_FOLDER)
+
+
 
 def get_file_list(dir: str, dupes_only=False) -> List[Path]:
     def return_file(file: Path) -> bool:
@@ -41,7 +56,7 @@ def get_file_list(dir: str, dupes_only=False) -> List[Path]:
         return True
 
     files: List[Path] = [Path(dir, file) for file in os.listdir(dir)]
-    return [file for file in file_list if return_file(file)]
+    return [file for file in files if return_file(file)]
 
 def is_a_duplicate(file: Path) -> bool:
     """Checks whether potential duplicate file (format XXXXX(\\d+).XXX) is truly a dupe.
@@ -65,7 +80,7 @@ def get_md5(file: Path) -> str:
         hash = hashlib.md5(f.read()).digest()
     return base64.b64encode(hash).decode('utf-8')
 
-def unzip(zip_file: Path, dir: str) -> List[Path]:
+def unzip(zip_file: Path, dir: str) -> Tuple[Path, List[Path]]:
     """Unzips file contents into specified directory. Adds year identifier to DRF files."""
 
     year = ''
@@ -88,9 +103,10 @@ def unzip(zip_file: Path, dir: str) -> List[Path]:
     if not corrected_zip_file.exists():
         zip_file.rename(corrected_zip_file)
 
-    return unzipped_files
+    return corrected_zip_file, unzipped_files
 
 def upload(file: Path, bucket: str, destination_path: str=''):
+    assert isinstance(file, Path)
     upload_path: str = ''
     if destination_path:
         upload_path += destination_path + '/'
@@ -117,7 +133,23 @@ def s3_duplicate(file: Path, bucket: str, destination_path: str=''):
         if get_md5(file) == response['Metadata']['md5chksum']:
             return True
     except Exception as e:
+        # logging.error(e)
+        pass
+
+    return False
+
+def is_in_s3(file: Path, bucket: str, destination_path: str='') -> bool:
+    s3_path: str = ''
+    if destination_path:
+        s3_path += destination_path + '/'
+
+    try:
+        response = s3.head_object(Bucket=bucket, Key=s3_path+file.name)
+        if get_md5(file) == response['Metadata']['md5chksum']:
+            return True
+    except Exception as e:
         logging.error(e)
+        pass
 
     return False
 
