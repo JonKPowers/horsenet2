@@ -124,9 +124,9 @@ class TestCloudFunctions():
         test_bucket = 'horsenet-testing'
         s3 = boto3.client('s3')
 
-        assert not s3_duplicate(file=plain_test_file, bucket=test_bucket)
+        assert not is_in_s3(file=plain_test_file, bucket=test_bucket)
         assert upload(file=plain_test_file, bucket=test_bucket)
-        assert s3_duplicate(file=plain_test_file, bucket=test_bucket)
+        assert is_in_s3(file=plain_test_file, bucket=test_bucket)
 
         try:
             s3.delete_object(Bucket=test_bucket, Key=plain_test_file.name)
@@ -140,7 +140,7 @@ class TestCloudFunctions():
         file_1, file_2 = same_name_diff_contents
         assert file_1.name == file_2.name
         assert upload(file=file_1, bucket=test_bucket)
-        assert not s3_duplicate(file=file_2, bucket=test_bucket)
+        assert not is_in_s3(file=file_2, bucket=test_bucket)
 
         try:
             s3.delete_object(Bucket=test_bucket, Key=file_1.name)
@@ -195,6 +195,12 @@ class TestCloudFunctions():
 
         for file in dupe_zips:
             assert not is_in_s3(file=file, bucket=test_bucket, destination_path='zip-files')
+
+    def test_uploads_plain_zips_before_possible_dupes(self):
+        pass
+
+    def test_renames_nonduplicate_files_on_upload(self):
+        pass
 
     def test_deletes_files_after_upload(self, folder_of_files):
         pass

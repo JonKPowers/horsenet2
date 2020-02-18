@@ -39,12 +39,32 @@ def unzip_and_upload(dir: str, bucket: str) -> bool:
 
     with TemporaryDirectory() as temp_dir:
         for file in files:
+            if check_for_s3_duplicate(file=file, bucket=bucket, destination_path=ZIP_FOLDER):
+                print(f'Skipped duplicate: {file}')
+                continue
             zip_file, unzipped_files = unzip(file, temp_dir)
             for unzipped_file in unzipped_files:
                 #if s3_duplicate(file=unzipped_file.name, bucket=bucket, destination_path='extracted-files'):
                 assert upload(file=unzipped_file, bucket=bucket, destination_path=EXTRACTED_FOLDER)
             assert upload(file=zip_file, bucket=bucket, destination_path=ZIP_FOLDER)
 
+def check_for_s3_duplicate(file: Path, bucket: str, destination_path: str) -> bool:
+    parts = re.search(r'(\w*) ?\(\d+\)', file.name)
+    if parts is None:
+        return False
+    print(f'Checking out possible duplicate: {file}')
+
+    plain_filename = Path(file.parents[0], parts.group(1) + file.suffix)
+    print(f'Plain file: {plain_filename}')
+    if not is_in_s3(file=plain_filename, bucket=bucket, destination_path=destination_path):
+        print('Plain file not in s3')
+        return False
+    if not s3_duplicate(file=file, s3_filename=plain_filename, 
+            bucket=bucket, destination_path=destination_path):
+        print('Plain file doesn\'t match md5 hash')
+        return False
+    print('Plain file is a duplicate')
+    return True
 
 
 def get_file_list(dir: str, dupes_only=False) -> List[Path]:
@@ -110,7 +130,7 @@ def upload(file: Path, bucket: str, destination_path: str=''):
     upload_path: str = ''
     if destination_path:
         upload_path += destination_path + '/'
-    if s3_duplicate(file, bucket, upload_path):
+    if is_in_s3(file=file, bucket=bucket, destination_path=upload_path):
         return False
     try:
         md5 = get_md5(file)
@@ -123,18 +143,18 @@ def upload(file: Path, bucket: str, destination_path: str=''):
         logging.error(f'Upload failed: {file}: {e}')
         return False
 
-def s3_duplicate(file: Path, bucket: str, destination_path: str=''):
+def s3_duplicate(file: Path, s3_filename: str,  bucket: str, destination_path: str=''):
     s3_path: str = ''
     if destination_path:
         s3_path += destination_path + '/'
-
+    assert isinstance(s3_filename, str)
+    assert isinstance(s3_path, str)
     try:
-        response = s3.head_object(Bucket=bucket, Key=s3_path+file.name)
+        response = s3.head_object(Bucket=bucket, Key=s3_path+s3_filename)
         if get_md5(file) == response['Metadata']['md5chksum']:
             return True
     except Exception as e:
-        # logging.error(e)
-        pass
+        logging.error(e)
 
     return False
 
@@ -144,12 +164,16 @@ def is_in_s3(file: Path, bucket: str, destination_path: str='') -> bool:
         s3_path += destination_path + '/'
 
     try:
+        # print(f'Checking for {s3_path+file.name} in bucket {bucket}')
         response = s3.head_object(Bucket=bucket, Key=s3_path+file.name)
         if get_md5(file) == response['Metadata']['md5chksum']:
             return True
     except Exception as e:
-        logging.error(e)
-        pass
+        if '404' in str(e): # Ignore not found errors, which we expect if file not in bucket
+            pass
+        else:
+            logging.error(e)
+            logging.error(e.__traceback__)
 
     return False
 
