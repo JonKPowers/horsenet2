@@ -184,8 +184,17 @@ class TestCloudFunctions():
             assert is_in_s3(file=file, bucket=test_bucket, destination_path='extracted-files')
             s3.delete_object(Bucket=test_bucket, Key='extracted-files/'+file.name)
 
-    def test_doesnt_upload_duplicate_file(self):
-        pass
+    def test_doesnt_upload_duplicate_file(self, folder_of_files_with_dupes):
+        test_bucket = 'horsenet-testing'
+        dir, zip_files, zipped_files, dupe_zips = folder_of_files_with_dupes
+
+        print(f'Dir {dir}')
+        print(f'Zip files: {zip_files}')
+        print(f'Dupes: {dupe_zips}')
+        unzip_and_upload(dir=dir, bucket=test_bucket)
+
+        for file in dupe_zips:
+            assert not is_in_s3(file=file, bucket=test_bucket, destination_path='zip-files')
 
     def test_deletes_files_after_upload(self, folder_of_files):
         pass

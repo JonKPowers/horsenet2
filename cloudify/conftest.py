@@ -5,6 +5,77 @@ import random
 from pathlib import Path
 import os
 from typing import List
+import hashlib 
+
+@pytest.fixture()
+def folder_of_files_with_dupes():
+    num_files = random.randint(10, 20)
+    file_descriptors: list = list()
+    zip_files: List[Path] = list()
+    zipped_files: List[Path] = list()
+    dupe_files: List[Path] = list()
+    file_contents: str = f'"Test","20201234","Test","Test","Test",\n' \
+                         f'"Test","20205678","Test","Test","Test",'
+
+    # Create the random files to zip up
+    for _ in range(num_files):
+        fd, fp = tempfile.mkstemp(suffix='.'+str(random.randint(1, 6)))
+        file_descriptors.append(fd)
+        zipped_files.append(Path(fp))
+        with open(fp, 'w') as f:
+            f.write(file_contents)
+
+    # Zip up the files, 1-6 files per zip
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file_counter = 0
+        assert num_files == len(zipped_files)
+        while file_counter < num_files:
+            finish_up = num_files - file_counter <= 6
+            num_to_zip = num_files - file_counter if finish_up else random.randint(1, 6)
+            make_dupes = random.choice([True, False])
+
+            # Base zip file
+            fd, fp = tempfile.mkstemp(suffix='a.zip', dir=temp_dir)
+            file_descriptors.append(fd)
+            file_path = Path(fp)
+            zip_files.append(file_path)
+
+            # Duplicate zip file
+            num: int = None
+            dup_zip: Path = None
+            if make_dupes:
+                num = random.randint(1, 6)
+                dup_zip = Path(temp_dir, file_path.stem + f'({num})' + file_path.suffix)
+                dupe_files.append(dup_zip)
+
+            with ZipFile(file_path, mode='w') as zf:
+                for _ in range(num_to_zip):
+                    file_to_add = zipped_files[file_counter]
+                    file_counter += 1
+                    zf.write(file_to_add, arcname=file_to_add.name)
+
+            if make_dupes:
+                with ZipFile(dup_zip, mode='w') as zf:
+                    file_counter -= num_to_zip # Rewind the counter for the dupe zip
+                    for _ in range(num_to_zip):
+                        file_to_add = zipped_files[file_counter]
+                        file_counter += 1
+                        zf.write(file_to_add, arcname=file_to_add.name)
+
+                assert hashlib.md5(open(file_path, 'rb').read()).digest() == hashlib.md5(open(dup_zip, 'rb').read()).digest()
+
+        assert file_counter == num_files
+
+        yield temp_dir, zip_files, zipped_files, dupe_files
+
+    for fd in file_descriptors:
+        os.close(fd)
+
+    for fp in zipped_files:
+        try:
+            fp.unlink()
+        except:
+            pass
 
 @pytest.fixture()
 def folder_of_files():
