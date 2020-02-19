@@ -36,6 +36,8 @@ def unzip_and_upload(dir: str, bucket: str) -> bool:
     # First process all the zip files
     files = get_file_list(dir)
     files = [file for file in files if file.suffix.lower() == '.zip']
+    # Possible duplicates at end of list:
+    files = put_dupes_at_end(files)
 
     with TemporaryDirectory() as temp_dir:
         for file in files:
@@ -49,7 +51,7 @@ def unzip_and_upload(dir: str, bucket: str) -> bool:
             assert upload(file=zip_file, bucket=bucket, destination_path=ZIP_FOLDER)
 
 def check_for_s3_duplicate(file: Path, bucket: str, destination_path: str) -> bool:
-    parts = re.search(r'(\w*) ?\(\d+\)', file.name)
+    parts = get_possible_dupe(file)
     if parts is None:
         return False
     print(f'Checking out possible duplicate: {file}')
@@ -59,7 +61,7 @@ def check_for_s3_duplicate(file: Path, bucket: str, destination_path: str) -> bo
     if not is_in_s3(file=plain_filename, bucket=bucket, destination_path=destination_path):
         print('Plain file not in s3')
         return False
-    if not s3_duplicate(file=file, s3_filename=plain_filename, 
+    if not s3_duplicate(file=file, s3_filename=plain_filename.name, 
             bucket=bucket, destination_path=destination_path):
         print('Plain file doesn\'t match md5 hash')
         return False
@@ -78,11 +80,28 @@ def get_file_list(dir: str, dupes_only=False) -> List[Path]:
     files: List[Path] = [Path(dir, file) for file in os.listdir(dir)]
     return [file for file in files if return_file(file)]
 
+def put_dupes_at_end(file_list: List[Path]) -> List[Path]:
+    """Put the files that look like a duplicate at the end of the file_list"""
+    dupes: List[Path] = list()
+    plains: List[Path] = list()
+    for i in range(-1, -len(file_list) -1, -1):
+        if _dupey_looking(file_list[i]):
+            dupes.append(file_list[i])
+        else:
+            plains.append(file_list[i])
+
+    plains.extend(dupes)
+    return plains
+
+
+def _dupey_looking(file: Path) -> bool:
+    return re.search(r' ?\(\d+\)', file.stem)
+
 def is_a_duplicate(file: Path) -> bool:
     """Checks whether potential duplicate file (format XXXXX(\\d+).XXX) is truly a dupe.
 
     First checks whether file without (\\d+) exists. If it does, checks whether they have the same file content."""
-    possible_dupe = re.search(r'(\w*) ?\(\d+\)', file.name)
+    possible_dupe = get_possible_dupe(file)
     if possible_dupe:
         possible_original = Path(file.parents[0], possible_dupe.group(1) + file.suffix)
         if possible_original.exists() and is_same_file(possible_original, file):
@@ -137,6 +156,7 @@ def upload(file: Path, bucket: str, destination_path: str=''):
         with open(file, 'rb') as data:
             s3.put_object(Bucket=bucket, Key=upload_path + file.name, 
                     Body=data, ContentMD5=md5, Metadata={'md5chksum': md5})
+        print(f'Uploaded {file}')
         return True
 
     except Exception as e:
@@ -196,6 +216,8 @@ def already_in_bucket(s3_path: str, bucket: str) -> bool:
         logging.error(e)
         return False
 
+def get_possible_dupe(file: Path) -> re.Match:
+    return re.search(r'(\w*) ?\(\d+\)', file.name)
         
 
 

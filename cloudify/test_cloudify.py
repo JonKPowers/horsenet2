@@ -5,6 +5,7 @@ from pathlib import Path
 
 from cloudify import is_a_duplicate, unzip, upload, already_in_bucket
 from cloudify import s3_duplicate, unzip_and_upload, is_in_s3, get_year_info
+from cloudify import get_file_list, put_dupes_at_end, _dupey_looking
 
 class TestCloudFunctions():
     def test_recognizes_duplicate_files(self, horse_duplicates_same_contents):
@@ -196,11 +197,24 @@ class TestCloudFunctions():
         for file in dupe_zips:
             assert not is_in_s3(file=file, bucket=test_bucket, destination_path='zip-files')
 
-    def test_uploads_plain_zips_before_possible_dupes(self):
-        pass
+    def test_puts_possible_dupes_at_end_of_file_list(self, folder_of_files_with_dupes):
+        test_bucket = 'horsenet-testing'
+        dir, zip_files, zipped_files, dupe_zips = folder_of_files_with_dupes
+
+        file_list = get_file_list(dir)
+        correct_list = zip_files
+        correct_list.extend(dupe_zips)
+
+        file_list = put_dupes_at_end(file_list)
+        cutoff_index: int = 0
+        while not _dupey_looking(file_list[cutoff_index]):
+            cutoff_index += 1
+
+        print(f'File list: {file_list}')
+        assert all([_dupey_looking(file) for file in file_list[cutoff_index:]])
 
     def test_renames_nonduplicate_files_on_upload(self):
-        pass
+        assert False, 'Finish the test'
 
     def test_deletes_files_after_upload(self, folder_of_files):
         pass
