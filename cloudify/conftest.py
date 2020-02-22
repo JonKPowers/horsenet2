@@ -4,8 +4,98 @@ import tempfile
 import random
 from pathlib import Path
 import os
-from typing import List
+from typing import List, Tuple
 import hashlib 
+
+FILE_CONTENTS: str = f'"Test","20201234","Test","Test","Test",\n' \
+                    f'"Test","20205678","Test","Test","Test",'
+class FileCounter:
+    def __init__(self):
+        self._count = 0
+
+    def use(self) -> int:
+        self._count += 1
+        return self._count - 1
+
+    def get(self) -> int:
+        return self._count
+
+    def rewind(self, num: int) -> bool:
+        self._count -= num
+        return True
+
+def make_random_files(num_files: int) -> Tuple[list, List[Path]]:
+    file_descriptors: list = list()
+    file_list: List[Path] = list()
+
+    for _ in range(num_files):
+        fd, fp = tempfile.mkstemp(suffix='.'+str(random.randint(1, 6)))
+        file_descriptors.append(fd)
+        file_list.append(Path(fp))
+        with open(fp, 'w') as f:
+            f.write(FILE_CONTENTS)
+
+    return file_descriptors, file_list
+
+def add_to_zip(zip_file: Path, file_to_add:Path):
+    # print(f'Zipfile {zip_file} added {file_to_add}')
+    with ZipFile(zip_file, mode='a') as zf:
+        zf.write(file_to_add, arcname=file_to_add.name)
+
+def make_a_zip(zip_file: Path, files_to_zip: List[Path], num_to_zip: int, counter: FileCounter):
+    for _ in range(num_to_zip):
+        file_to_add = files_to_zip[counter.use()]
+        add_to_zip(zip_file, file_to_add)
+
+@pytest.fixture
+def folder_of_files_with_nondupes():
+    num_files = random.randint(10, 20)
+    file_descriptors: list = None
+    zip_files: List[Path] = list()
+    zipped_files: List[Path] = None
+    dupe_files: List[Path] = list()
+
+    file_descriptors, zipped_files = make_random_files(num_files)
+
+    # Zip up the files, 1-6 files per zip
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file_counter = FileCounter()
+        assert num_files == len(zipped_files)
+        while file_counter.get() < num_files:
+            finish_up = num_files - file_counter.get() <= 7
+            num_to_zip = num_files - file_counter.get() - 1 if finish_up else random.randint(1, 6)
+
+            # Base zip file
+            if num_to_zip != 0:
+                fd, fp = tempfile.mkstemp(suffix='a.zip', dir=temp_dir)
+                file_descriptors.append(fd)
+                file_path = Path(fp)
+                zip_files.append(file_path)
+
+            make_a_zip(file_path, zipped_files, num_to_zip, file_counter)
+
+            # Make fake dupe if make_dupes
+            make_dupes = random.choice([True, False])
+            if make_dupes:
+                fd, fp = tempfile.mkstemp(suffix='a(' + str(random.randint(1,6)) + ').zip', dir=temp_dir)
+                file_descriptors.append(fd)
+                dupe_files.append(Path(fp))
+
+                file_to_add = zipped_files[file_counter.use()]
+                add_to_zip(dupe_files[-1], file_to_add)
+
+        assert file_counter.get() == num_files
+
+        yield temp_dir, zip_files, zipped_files, dupe_files
+
+    for fd in file_descriptors:
+        os.close(fd)
+
+    for fp in zipped_files:
+        try:
+            fp.unlink()
+        except:
+            pass
 
 @pytest.fixture()
 def folder_of_files_with_dupes():
@@ -14,31 +104,25 @@ def folder_of_files_with_dupes():
     zip_files: List[Path] = list()
     zipped_files: List[Path] = list()
     dupe_files: List[Path] = list()
-    file_contents: str = f'"Test","20201234","Test","Test","Test",\n' \
-                         f'"Test","20205678","Test","Test","Test",'
+    make_dupes = True
 
-    # Create the random files to zip up
-    for _ in range(num_files):
-        fd, fp = tempfile.mkstemp(suffix='.'+str(random.randint(1, 6)))
-        file_descriptors.append(fd)
-        zipped_files.append(Path(fp))
-        with open(fp, 'w') as f:
-            f.write(file_contents)
+    file_descriptors, zipped_files = make_random_files(num_files)
 
     # Zip up the files, 1-6 files per zip
     with tempfile.TemporaryDirectory() as temp_dir:
-        file_counter = 0
+        file_counter = FileCounter()
         assert num_files == len(zipped_files)
-        while file_counter < num_files:
-            finish_up = num_files - file_counter <= 6
-            num_to_zip = num_files - file_counter if finish_up else random.randint(1, 6)
-            make_dupes = random.choice([True, False])
+        while file_counter.get() < num_files:
+            finish_up = num_files - file_counter.get() <= 6
+            num_to_zip = num_files - file_counter.get() if finish_up else random.randint(1, 6)
 
             # Base zip file
             fd, fp = tempfile.mkstemp(suffix='a.zip', dir=temp_dir)
             file_descriptors.append(fd)
             file_path = Path(fp)
             zip_files.append(file_path)
+
+            make_a_zip(file_path, zipped_files, num_to_zip, file_counter)
 
             # Duplicate zip file
             num: int = None
@@ -48,23 +132,16 @@ def folder_of_files_with_dupes():
                 dup_zip = Path(temp_dir, file_path.stem + f'({num})' + file_path.suffix)
                 dupe_files.append(dup_zip)
 
-            with ZipFile(file_path, mode='w') as zf:
-                for _ in range(num_to_zip):
-                    file_to_add = zipped_files[file_counter]
-                    file_counter += 1
-                    zf.write(file_to_add, arcname=file_to_add.name)
-
-            if make_dupes:
-                with ZipFile(dup_zip, mode='w') as zf:
-                    file_counter -= num_to_zip # Rewind the counter for the dupe zip
-                    for _ in range(num_to_zip):
-                        file_to_add = zipped_files[file_counter]
-                        file_counter += 1
-                        zf.write(file_to_add, arcname=file_to_add.name)
+                file_counter.rewind(num_to_zip) # Rewind the counter for the dupe zip
+                make_a_zip(dup_zip, zipped_files, num_to_zip, file_counter)
 
                 assert hashlib.md5(open(file_path, 'rb').read()).digest() == hashlib.md5(open(dup_zip, 'rb').read()).digest()
 
-        assert file_counter == num_files
+            make_dupes = random.choice([True, False])
+
+        assert file_counter.get() == num_files
+        assert len(dupe_files) != 0
+        print(f'Nondupes: {dupe_files}')
 
         yield temp_dir, zip_files, zipped_files, dupe_files
 
@@ -83,16 +160,8 @@ def folder_of_files():
     file_descriptors: list = list()
     zip_files: List[Path] = list()
     zipped_files: List[Path] = list()
-    file_contents: str = f'"Test","20201234","Test","Test","Test",\n' \
-                         f'"Test","20205678","Test","Test","Test",'
 
-    # Create the random files to zip up
-    for _ in range(num_files):
-        fd, fp = tempfile.mkstemp(suffix='.'+str(random.randint(1, 6)))
-        file_descriptors.append(fd)
-        zipped_files.append(Path(fp))
-        with open(fp, 'w') as f:
-            f.write(file_contents)
+    file_descriptors, zipped_files = make_random_files(num_files)
 
     # Zip up the files, 1-6 files per zip
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -105,11 +174,10 @@ def folder_of_files():
             file_descriptors.append(fd)
             file_path = Path(fp)
             zip_files.append(file_path)
-            with ZipFile(file_path, mode='w') as zf:
-                for _ in range(num_to_zip):
-                    file_to_add = zipped_files[file_counter]
-                    file_counter += 1
-                    zf.write(file_to_add, arcname=file_to_add.name)
+            for _ in range(num_to_zip):
+                file_to_add = zipped_files[file_counter]
+                file_counter += 1
+                add_to_zip(file_path, file_to_add)
         assert file_counter == num_files
 
         yield temp_dir, zip_files, zipped_files
@@ -223,9 +291,8 @@ def zipped_needs_years_file():
             file.write(file_contents)
 
     # Zip up the files and return the zip, a list of contents, and the target year
-    with ZipFile(zip_file, mode='w') as z:
-        for item in temp_paths[1:]:
-            z.write(item, arcname=item.name)
+    for item in temp_paths[1:]:
+        add_to_zip(zip_file, item)
 
     yield zip_file, temp_paths[1:], year
 
@@ -244,7 +311,7 @@ def zipped_needs_years_file():
 def zipped_files():
     zipped_file_paths: List[Path] = list()
     zipped_file_descriptors: list = list()
-    num_files = random.randrange(1, 200)
+    num_files = random.randrange(1, 20)
     print(num_files)
 
     for _ in range(num_files):
@@ -252,14 +319,13 @@ def zipped_files():
         zipped_file_descriptors.append(fd)
         zipped_file_paths.append(Path(fp))
 
-    fd, zip_file_path = tempfile.mkstemp(suffix='.zip')
+    fd, zip_file_path = tempfile.mkstemp(suffix='a.zip')
     zipped_file_descriptors.append(fd)
 
-    with ZipFile(zip_file_path, mode='w') as zip_file:
-        for item in zipped_file_paths:
-            zip_file.write(item, arcname=item.name)
+    for item in zipped_file_paths:
+        add_to_zip(zip_file_path, item)
 
-    yield Path(zip_file_path), [file.name for file in zipped_file_paths]
+    yield Path(zip_file_path), zipped_file_paths
 
     # Cleanup
     for descriptor in zipped_file_descriptors:

@@ -41,16 +41,24 @@ def unzip_and_upload(dir: str, bucket: str) -> bool:
 
     with TemporaryDirectory() as temp_dir:
         for file in files:
+            print(f'Unzip/uploading {file}')
             if check_for_s3_duplicate(file=file, bucket=bucket, destination_path=ZIP_FOLDER):
                 print(f'Skipped duplicate: {file}')
                 continue
+            if _dupey_looking(file):
+                new_name = get_plain_filename(file, bucket=bucket, destination_path=ZIP_FOLDER)
+                file.rename(new_name)
+                file = new_name
             zip_file, unzipped_files = unzip(file, temp_dir)
             for unzipped_file in unzipped_files:
                 #if s3_duplicate(file=unzipped_file.name, bucket=bucket, destination_path='extracted-files'):
                 assert upload(file=unzipped_file, bucket=bucket, destination_path=EXTRACTED_FOLDER)
             assert upload(file=zip_file, bucket=bucket, destination_path=ZIP_FOLDER)
 
+            file.unlink()
+
 def check_for_s3_duplicate(file: Path, bucket: str, destination_path: str) -> bool:
+    # First check if looks like a duplicate
     parts = get_possible_dupe(file)
     if parts is None:
         return False
@@ -58,13 +66,19 @@ def check_for_s3_duplicate(file: Path, bucket: str, destination_path: str) -> bo
 
     plain_filename = Path(file.parents[0], parts.group(1) + file.suffix)
     print(f'Plain file: {plain_filename}')
+
+    # If it looks like a dupe, see if the plain file is in S3
     if not is_in_s3(file=plain_filename, bucket=bucket, destination_path=destination_path):
         print('Plain file not in s3')
         return False
+
+    # If there's a plainfile in S3, check if md5 matches
     if not s3_duplicate(file=file, s3_filename=plain_filename.name, 
             bucket=bucket, destination_path=destination_path):
         print('Plain file doesn\'t match md5 hash')
         return False
+
+    # If it matches, return True
     print('Plain file is a duplicate')
     return True
 
@@ -94,8 +108,6 @@ def put_dupes_at_end(file_list: List[Path]) -> List[Path]:
     return plains
 
 
-def _dupey_looking(file: Path) -> bool:
-    return re.search(r' ?\(\d+\)', file.stem)
 
 def is_a_duplicate(file: Path) -> bool:
     """Checks whether potential duplicate file (format XXXXX(\\d+).XXX) is truly a dupe.
@@ -149,7 +161,7 @@ def upload(file: Path, bucket: str, destination_path: str=''):
     upload_path: str = ''
     if destination_path:
         upload_path += destination_path + '/'
-    if is_in_s3(file=file, bucket=bucket, destination_path=upload_path):
+    if is_in_s3(file=file, bucket=bucket, destination_path=destination_path):
         return False
     try:
         md5 = get_md5(file)
@@ -184,10 +196,8 @@ def is_in_s3(file: Path, bucket: str, destination_path: str='') -> bool:
         s3_path += destination_path + '/'
 
     try:
-        # print(f'Checking for {s3_path+file.name} in bucket {bucket}')
         response = s3.head_object(Bucket=bucket, Key=s3_path+file.name)
-        if get_md5(file) == response['Metadata']['md5chksum']:
-            return True
+        return True
     except Exception as e:
         if '404' in str(e): # Ignore not found errors, which we expect if file not in bucket
             pass
@@ -195,6 +205,7 @@ def is_in_s3(file: Path, bucket: str, destination_path: str='') -> bool:
             logging.error(e)
             logging.error(e.__traceback__)
 
+    print(f'Did not find {s3_path+file.name} in S3')
     return False
 
 def get_year_info(zip_file: Path) -> str:
@@ -216,8 +227,16 @@ def already_in_bucket(s3_path: str, bucket: str) -> bool:
         logging.error(e)
         return False
 
+def _dupey_looking(file: Path) -> bool:
+    return re.search(r' ?\(\d+\)', file.stem)
+
 def get_possible_dupe(file: Path) -> re.Match:
     return re.search(r'(\w*) ?\(\d+\)', file.name)
         
-
+def get_plain_filename(file: Path, bucket: str, destination_path: str) -> Path:
+    parts = re.search(r'(\w*) ?\(\d+\)', file.stem)
+    plain_filename = Path(file.parents[0], parts.group(1) + file.suffix)
+    while is_in_s3(file=plain_filename, bucket=bucket, destination_path=destination_path):
+        plain_filename = Path(file.parents[0], parts.group(1) + str(random.randint(100)) + file.suffix)
+    return plain_filename
 

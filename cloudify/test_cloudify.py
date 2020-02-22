@@ -1,11 +1,14 @@
+import logging
 import pytest
 import boto3
 from tempfile import TemporaryDirectory
 from pathlib import Path
+import re
 
 from cloudify import is_a_duplicate, unzip, upload, already_in_bucket
 from cloudify import s3_duplicate, unzip_and_upload, is_in_s3, get_year_info
 from cloudify import get_file_list, put_dupes_at_end, _dupey_looking
+from cloudify import get_plain_filename
 
 class TestCloudFunctions():
     def test_recognizes_duplicate_files(self, horse_duplicates_same_contents):
@@ -141,7 +144,7 @@ class TestCloudFunctions():
         file_1, file_2 = same_name_diff_contents
         assert file_1.name == file_2.name
         assert upload(file=file_1, bucket=test_bucket)
-        assert not is_in_s3(file=file_2, bucket=test_bucket)
+        assert not s3_duplicate(file=file_2, s3_filename=file_2.name, bucket=test_bucket)
 
         try:
             s3.delete_object(Bucket=test_bucket, Key=file_1.name)
@@ -185,7 +188,7 @@ class TestCloudFunctions():
             assert is_in_s3(file=file, bucket=test_bucket, destination_path='extracted-files')
             s3.delete_object(Bucket=test_bucket, Key='extracted-files/'+file.name)
 
-    def test_doesnt_upload_duplicate_file(self, folder_of_files_with_dupes):
+    def test_doesnt_upload_duplicate_zip_file(self, folder_of_files_with_dupes):
         test_bucket = 'horsenet-testing'
         dir, zip_files, zipped_files, dupe_zips = folder_of_files_with_dupes
 
@@ -196,6 +199,34 @@ class TestCloudFunctions():
 
         for file in dupe_zips:
             assert not is_in_s3(file=file, bucket=test_bucket, destination_path='zip-files')
+        
+        s3 = boto3.client('s3')
+        for file in zip_files:
+            try:
+                s3.delete_object(Bucket=test_bucket, Key='zip-files/' + file.name)
+            except Exception as e:
+                logging.error(e)
+        for file in zipped_files:
+            try:
+                s3.delete_object(Bucket=test_bucket, Key='extracted-files/' + file.name)
+            except Exception as e:
+                logging.error(e)
+
+    def test_doesnt_upload_duplicate_unzipped_files(self, zipped_files):
+        zip_file, zipped_files = zipped_files
+        test_bucket = 'horsenet-testing'
+
+        for file in zipped_files:
+            assert upload(file=file, bucket=test_bucket, destination_path='extracted-files')
+
+        for file in zipped_files:
+            assert not upload(file=file, bucket=test_bucket, destination_path='extracted-files')
+
+        for file in zipped_files:
+            try:
+                s3.delete_object(Bucket=test_bucket, Key='extracted-files/' + file.name)
+            except Exception as e:
+                logging.error(e)
 
     def test_puts_possible_dupes_at_end_of_file_list(self, folder_of_files_with_dupes):
         test_bucket = 'horsenet-testing'
@@ -213,11 +244,54 @@ class TestCloudFunctions():
         print(f'File list: {file_list}')
         assert all([_dupey_looking(file) for file in file_list[cutoff_index:]])
 
-    def test_renames_nonduplicate_files_on_upload(self):
-        assert False, 'Finish the test'
+    def test_renames_nonduplicate_files_on_upload(self, folder_of_files_with_nondupes):
+        temp_dir, zip_files, zipped_files, dupe_files = folder_of_files_with_nondupes
+        test_bucket = 'horsenet-testing'
+        s3 = boto3.client('s3')
+
+        unzip_and_upload(dir=temp_dir, bucket=test_bucket)
+
+        for file in dupe_files:
+            stem = re.search(r'(\w*) ?\(\d+\)', file.stem).group(1)
+            corrected_name = Path(temp_dir, stem + file.suffix)
+
+            assert is_in_s3(file=corrected_name, bucket=test_bucket, destination_path='zip-files')
+
+            try:
+                s3.delete_object(Bucket=test_bucket, Key='zip-files/' + corrected_name.name)
+            except Exception as e:
+                logging.error(e)
+
+        for file in zip_files:
+            try: s3.delete_object(Bucket=test_bucket, Key='zip-files/' + file.name)
+            except: pass
+
+        for file in zipped_files:
+            try: s3.delete_object(Bucket=test_bucket, Key='extracted-files/' + file.name)
+            except: pass
 
     def test_deletes_files_after_upload(self, folder_of_files):
-        pass
+        temp_dir, zip_files, zipped_files = folder_of_files
+        test_bucket = 'horsenet-testing'
+        s3 = boto3.client('s3')
 
+        unzip_and_upload(temp_dir, bucket=test_bucket)
+
+        for file in zip_files:
+            assert not file.exists()
+
+        for file in zip_files:
+            try:
+                s3.delete_object(Bucket=test_bucket, Key='zip-files/'+file.name)
+            except Exception as e:
+                logging.error(e)
+
+        for file in zipped_files:
+            try:
+                s3.delete_object(Bucket=test_bucket, Key='extracted-files/'+file.name)
+            except Exception as e:
+                logging.error(e)
+
+    @pytest.mark.skip()
     def test_deletes_duplicates_in_upload_folder(self, folder_of_files):
         pass
